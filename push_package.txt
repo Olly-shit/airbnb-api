@@ -1,0 +1,7 @@
+docker build --tag airbnb-api . --no-cache
+
+echo $PAT | docker login ghcr.io --username <your-username>  --password <your-personal-access-token>
+
+docker tag airbnb-api ghcr.io/Olly-shit/airbnb-api:1.0.0
+
+docker push ghcr.io/olly-shit/airbnb-api:1.0.0
