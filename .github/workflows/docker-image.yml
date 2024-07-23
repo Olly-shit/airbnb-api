@@ -1,0 +1,47 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Log in to GitHub Container Registry
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: echo "${{ secrets.PAT }}" | docker login ghcr.io --username ${{ github.actor }} --password-stdin
+
+    - name: Get the latest version tag
+      id: get_tag
+      run: |
+        LATEST_TAG=$(curl -s "https://ghcr.io/v2/olly-shit/airbnb-api/tags/list" | jq -r '.tags | map(select(test("^\\d+\\.\\d+\\.\\d+$"))) | sort_by(split(".") | map(tonumber)) | last')
+        echo "latest_tag=$LATEST_TAG" >> $GITHUB_ENV
+
+    - name: Increment version tag
+      id: increment_tag
+      run: |
+        if [ -z "$LATEST_TAG" ]; then
+          NEW_TAG="1.0.0"
+        else
+          IFS='.' read -r -a parts <<< "$LATEST_TAG"
+          parts[2]=$((parts[2] + 1))
+          NEW_TAG="${parts[0]}.${parts[1]}.${parts[2]}"
+        fi
+        echo "new_tag=$NEW_TAG" >> $GITHUB_ENV
+
+    - name: Build the Docker image
+      run: |
+        docker build --tag airbnb-api:${{ env.new_tag }} . --no-cache
+
+    - name: Tag and Push the Docker image
+      run: |
+        docker tag airbnb-api:${{ env.new_tag }} ghcr.io/olly-shit/airbnb-api:${{ env.new_tag }}
+        docker push ghcr.io/olly-shit/airbnb-api:${{ env.new_tag }}
